@@ -69,7 +69,8 @@ class AuthorizationController private constructor(context: Context) {
         )
 
         if (response === null || response.code != 200) {
-            throw Exception("Failed to obtain token: ${response?.code}")
+            //throw Exception("Failed to obtain token: ${response?.code}")
+            throw Exception(response?.body.toString())
         } else {
             val responseBody = response.body?.string() ?: throw Exception("Empty response body")
 
