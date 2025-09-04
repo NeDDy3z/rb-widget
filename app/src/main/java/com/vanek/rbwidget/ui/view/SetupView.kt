@@ -1,161 +1,165 @@
 package com.vanek.rbwidget.ui.view
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import com.vanek.rbwidget.controller.AuthorizationController
+import com.vanek.rbwidget.controller.NavigationState
+
 
 @Composable
-fun SetupPartOneView(modifier: Modifier = Modifier, onContinueClicked: () -> Unit) {
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background // Use background color for the Surface
-    ) {
-        // Top padding
-        Column(modifier = modifier.fillMaxHeight(0.33f)){}
+fun SetupView(
+    modifier: Modifier = Modifier,
+    errorMessage: String? = null,
+    onContinue: (clientId: String, clientSecret: String) -> Unit,
+) {
+    var clientId by remember { mutableStateOf("") }
+    var clientSecret by remember { mutableStateOf("") }
+    var localErrorMessage by remember { mutableStateOf(errorMessage) }
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
-        // Contents
-        Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.33f),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Setup your RB API Connection",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = modifier.padding(16.dp),
-            )
-            Button(
-                onClick = { onContinueClicked },
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .padding(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                )
-            ) {
-                Text(
-                    text = "Continue",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-        }
-
-        // Bottom padding
-        Column(modifier = modifier.fillMaxHeight(0.33f)){}
-    }
-}
-
-@Composable
-fun SetupPartTwoView(modifier: Modifier = Modifier, onContinueClicked: () -> Unit) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(64.dp))
+
             Text(
-                text = "Enter your Client ID and Client Secret obtained at the RB Developer Portal",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
+                text = "Enter your API credentials",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Text(
+                text = "How to get them?",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+                modifier = Modifier
+                    .padding(bottom = 8.dp)
+                    .clickable { uriHandler.openUri("https://api.rbinternational.com/en/pages/getting-started/how-to-use-api-marketplace") }
             )
 
-
-            var clientId by remember { mutableStateOf("") }
-            var clientSecret by remember { mutableStateOf("") }
-
-            TextField(
+            OutlinedTextField(
                 value = clientId,
                 onValueChange = { clientId = it },
                 label = { Text("Client ID") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                singleLine = true
+                    .padding(vertical = 8.dp),
+                shape = RoundedCornerShape(12.dp)
             )
 
-            TextField(
+            OutlinedTextField(
                 value = clientSecret,
                 onValueChange = { clientSecret = it },
                 label = { Text("Client Secret") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 32.dp),
+                    .padding(vertical = 8.dp),
                 visualTransformation = PasswordVisualTransformation(),
-                singleLine = true
+                shape = RoundedCornerShape(12.dp)
             )
 
             Button(
-                onClick = { onContinueClicked },
+                onClick = {
+                    if (clientId.isNotBlank() && clientSecret.isNotBlank()) {
+                        onContinue(clientId, clientSecret)
+                    } else {
+                        localErrorMessage = "Please fill in both fields."
+                    }
+                },
                 modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp)
+                    .height(48.dp)
+                ,
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Text(
                     text = "Continue",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
-            // Clickable text link
-            val annotatedText = buildAnnotatedString {
-                append("Don't know where to get the credentials? Click here.")
-                pushStringAnnotation(tag = "LINK", annotation = "https://developer.rb.com")
-                pop()
-                addStyle(
-                    style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        textDecoration = TextDecoration.Underline
-                    ),
-                    start = 10,
-                    end = length
+            Column(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+            ) {
+                Text(
+                    text = localErrorMessage ?: "",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
                 )
             }
 
-            ClickableText(
-                text = annotatedText,
-                modifier = Modifier.padding(top = 16.dp),
-                onClick = { offset ->
-                    annotatedText.getStringAnnotations(tag = "LINK", start = offset, end = offset)
-                        .firstOrNull()?.let { annotation ->
-                            // TODO: Handle link click, e.g., open a browser
-                            println("Clicked on link: ${annotation.item}")
-                        }
-                }
-            )
         }
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun SetupViewPreview() {
+    SetupView(
+        errorMessage = "Sample error message",
+        onContinue = { _, _ -> }
+    )
+}
+
+@Composable
+fun SetupFlowController(navController: NavController) {
+    LoadingView()
+
+    LaunchedEffect(Unit) {
+        val authController = AuthorizationController.get()
+
+        val isAuthorized = try {
+            authController.getAuthorization().isAuthorized()
+        } catch(e: Exception) {
+            false
+        }
+
+        if (isAuthorized) {
+            navController.navigate(NavigationState.HOME) {
+                popUpTo(NavigationState.SETUP_PART_ONE) { inclusive = true }
+            }
+        } else {
+            navController.navigate(NavigationState.SETUP_PART_ONE + "?error=" +
+                "Authorization failed. Please check your credentials and try again.") {
+                popUpTo(NavigationState.SETUP_PART_ONE) { inclusive = true }
+            }
+        }
+    }
+}
+

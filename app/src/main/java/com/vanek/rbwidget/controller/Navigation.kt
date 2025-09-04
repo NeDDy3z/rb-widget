@@ -1,66 +1,66 @@
-import androidx.compose.material3.Text
+package com.vanek.rbwidget.controller
+
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.vanek.rbwidget.ui.view.SetupPartOneView
-import com.vanek.rbwidget.ui.view.SetupPartTwoView
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.vanek.rbwidget.ui.view.*
 
-sealed class Screen(val route: String) {
-    object Setup : Screen("setup")
-    object Home : Screen("home")
-    object Settings : Screen("settings")
+object NavigationState {
+    const val HOME = "main"
+    const val SETTINGS = "settings"
+    const val LOADING = "loading"
+    const val SETUP_PART_ONE = "setup_part_one"
+    const val SETUP_PART_TWO = "setup_part_two"
 }
 
 @Composable
-fun AppNavigation() {
+fun Navigation(startDestination: String = NavigationState.HOME) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = Screen.Setup.route) {
-        composable(Screen.Setup.route) {
-            SetupView(onSetupComplete = {
-                navController.navigate(Screen.Home.route) {
-                    // Pop Setup from back stack so user can't go back to it
-                    popUpTo(Screen.Setup.route) {
-                        inclusive = true
-                    }
+    NavHost(navController, startDestination = startDestination) {
+        // Home
+        composable(NavigationState.HOME) {
+            HomeView(
+                onSettingsClicked = { navController.navigate(NavigationState.SETTINGS) }
+            )
+        }
+
+        // Settings
+        composable(NavigationState.SETTINGS) {
+            SettingsView(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // Setup
+        composable(
+            route = NavigationState.SETUP_PART_ONE + "?error={error}",
+            arguments = listOf(
+                navArgument("error") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
-            })
+            )
+        ) { backStackEntry ->
+            val error = backStackEntry.arguments?.getString("error")
+            SetupView(
+                errorMessage = error,
+                onContinue = { clientId, clientSecret ->
+                    AuthorizationController.get().saveCredentials(
+                        clientId = clientId,
+                        clientSecret = clientSecret
+                    )
+
+                    navController.navigate(NavigationState.SETUP_PART_TWO)
+                },
+            )
         }
-        composable(Screen.Home.route) {
-            HomeView()
-        }
-        composable(Screen.Settings.route) {
-            // SettingsView()
+        composable(NavigationState.SETUP_PART_TWO) {
+            SetupFlowController(navController)
         }
     }
-}
-
-@Composable
-fun SetupView(onSetupComplete: () -> Unit) {
-    var showPartTwo by remember { mutableStateOf(false) }
-
-    if (!showPartTwo) {
-        SetupPartOneView(
-            onContinueClicked = {
-                showPartTwo = true
-            }
-        )
-    } else {
-        SetupPartTwoView(
-            onContinueClicked = {
-                onSetupComplete()
-            }
-        )
-    }
-}
-
-@Composable
-fun HomeView() {
-    // ... Your HomeView content
-    Text("Welcome Home!")
 }
