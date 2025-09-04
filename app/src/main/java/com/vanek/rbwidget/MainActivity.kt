@@ -17,6 +17,8 @@ class MainActivity : ComponentActivity() {
         val authController = AuthorizationController.get()
         val isAuthorized = try { authController.getAuthorization().isAuthorized() } catch(e: Exception) { false }
 
+
+
         val startDestination = when(false) {
             isAuthorized -> NavigationState.SETUP_PART_ONE
             else -> NavigationState.HOME
