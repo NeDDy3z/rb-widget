@@ -18,12 +18,16 @@ data class Authorization(
     }
 
     companion object {
-        fun fromPrefs(prefs: android.content.SharedPreferences): Authorization {
+        fun fromPrefs(prefs: android.content.SharedPreferences): Authorization? {
             val token = prefs.getString("token", null)
             val refreshToken = prefs.getString("refreshToken", null)
             val expiresAt = prefs.getString("expiresAt", null)?.toIntOrNull()
 
-            return Authorization(token, refreshToken, expiresAt)
+            if (token == null || refreshToken == null || expiresAt == null) {
+                return null
+            } else {
+                return Authorization(token, refreshToken, expiresAt)
+            }
         }
     }
 }

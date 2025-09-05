@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.vanek.rbwidget.controller.AuthorizationController
 import com.vanek.rbwidget.controller.NavigationState
+import kotlinx.coroutines.withContext
 
 
 @Composable
@@ -144,22 +145,17 @@ fun SetupFlowController(navController: NavController) {
     LaunchedEffect(Unit) {
         val authController = AuthorizationController.get()
 
-        val isAuthorized = try {
-            authController.getAuthorization().isAuthorized()
-        } catch(e: Exception) {
-            false
-        }
-
-        if (isAuthorized) {
-            navController.navigate(NavigationState.HOME) {
-                popUpTo(NavigationState.SETUP_PART_ONE) { inclusive = true }
-            }
-        } else {
-            navController.navigate(NavigationState.SETUP_PART_ONE + "?error=" +
-                "Authorization failed. Please check your credentials and try again.") {
-                popUpTo(NavigationState.SETUP_PART_ONE) { inclusive = true }
+        authController.authorize {
+                result, error ->
+            if (result !== null) {
+                navController.navigate(NavigationState.HOME) {
+                    popUpTo(NavigationState.STARTUP) { inclusive = true }
+                }
+            } else {
+                navController.navigate(NavigationState.SETUP_PART_ONE + if (error != null) "?error=${error}" else "") {
+                    popUpTo(NavigationState.STARTUP) { inclusive = true }
+                }
             }
         }
     }
 }
-

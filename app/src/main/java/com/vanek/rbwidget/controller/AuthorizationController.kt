@@ -1,11 +1,10 @@
 package com.vanek.rbwidget.controller
 
-import ApiClient
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import com.google.gson.Gson
 import com.vanek.rbwidget.model.Authorization
+import com.vanek.rbwidget.model.network.RBClient
 
 class AuthorizationController private constructor(context: Context) {
 
@@ -31,69 +30,96 @@ class AuthorizationController private constructor(context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-    val apiClient = ApiClient(baseUrl = "https://api.rbinternational.com")
+    val rbClient = RBClient()
+    private var authorization: Authorization? = Authorization.fromPrefs(prefs)
+
+    fun setAuthorization(auth: Authorization) {
+        authorization = auth
+    }
+
+    fun getAuthorization(): Authorization? {
+        return authorization
+    }
 
 
-    suspend fun getAuthorization(): Authorization {
-        val authorization = Authorization.fromPrefs(prefs)
+    fun authorize(onComplete: (result: Authorization?, error: String?) -> Unit) {
+        val auth = getAuthorization()
 
-        return if (!authorization.isAuthorized()) {
-            val (clientId, clientSecret) = getCredentials()
+        if (auth !== null && auth.isAuthorized()) {
+            onComplete(auth, null)
+        } else if (getClientCredentials() !== null) {
+            val credentials = getClientCredentials()!!
             obtainNewToken(
-                clientId = clientId,
-                clientSecret = clientSecret,
-            )
+                credentials.first,
+                credentials.second
+            ) { success, error ->
+                if (success) {
+                    val newAuth = Authorization(
+                        token = prefs.getString("token", null) ?: "",
+                        refreshToken = prefs.getString("refreshToken", null) ?: "",
+                        expiresAt = prefs.getLong("expiresAt", 0).toInt()
+                    )
+                    onComplete(newAuth, null)
+                } else {
+                    onComplete(null, error)
+                }
+            }
         } else {
-            authorization
+            onComplete(null, "Could not authorize - missing client credentials")
         }
     }
 
-    fun saveCredentials(clientId: String, clientSecret: String) {
-        prefs.edit {
-            putString("client_id", clientId)
-            putString("client_secret", clientSecret)
-        }
-    }
-
-    private suspend fun obtainNewToken(
+    private fun obtainNewToken(
         clientId: String,
-        clientSecret: String
-    ): Authorization {
-        val response = apiClient.post(
-            uri = "/aisp/oauth2/token",
-            body = "{\"client_id\":\"$clientId\",\"client_secret\":\"$clientSecret\"}",
-        )
+        clientSecret: String,
+        onComplete: (success: Boolean, error: String?) -> Unit
+    ) {
+        rbClient.authorize(
+            clientId = clientId,
+            clientSecret = clientSecret
+        ) { result ->
+            if (result.isSuccess && result.data != null) {
+                val authResponse = result.data
 
-        if (response === null || response.code != 200) {
-            throw Exception("Balls" + response?.body.toString())
-        } else {
-            val responseBody = response.body?.string() ?: throw Exception("Empty response body")
+                val token = authResponse.token
+                val refreshToken = authResponse.refreshToken
+                val expiresAt = System.currentTimeMillis() / 1000 + authResponse.expiresAt
 
-            val responseMap: Map<String, Any> =
-                Gson().fromJson(responseBody, Map::class.java) as Map<String, Any>
-            val token = responseMap["access_token"] as? String?
-            val refreshToken = responseMap["refresh_token"] as? String?
-            val expiresIn = (responseMap["expires_in"] as? Int?)
+                prefs.edit {
+                    putString("token", token)
+                    putString("refreshToken", refreshToken)
+                    putLong("expiresAt", System.currentTimeMillis() / 1000 + expiresAt)
+                }
 
-            if (token == null || refreshToken == null || expiresIn == null) {
-                throw Exception("Invalid response: $responseBody")
-            }
-
-            prefs.edit {
-                putString("token", token)
-                putString("refreshToken", refreshToken)
-                putString("expiresAt", expiresIn.toString())
+                setAuthorization(
+                    auth = Authorization(
+                        token = token,
+                        refreshToken = refreshToken,
+                        expiresAt = (System.currentTimeMillis() / 1000 + expiresAt).toInt()
+                    )
+                )
+                onComplete(true, null)
+            } else {
+                onComplete(false, "Authentication failed - ${result.statusCode}")
             }
         }
-
-        return Authorization.fromPrefs(prefs)
     }
 
-    private fun getCredentials(): Pair<String, String> {
-        val clientId = prefs.getString("client_id", null) ?: throw Exception("Client ID not found")
-        val clientSecret =
-            prefs.getString("client_secret", null) ?: throw Exception("Client Secret not found")
+    private fun getClientCredentials(): Pair<String, String>? {
+        val clientId = prefs.getString("clientId", null)
+        val clientSecret = prefs.getString("clientSecret", null)
 
-        return Pair(clientId, clientSecret)
+        if (clientId != null && clientSecret != null) {
+            return Pair(clientId, clientSecret)
+        }
+
+        return null
+    }
+
+    fun saveClientCredentials(clientId: String, clientSecret: String) {
+        prefs.edit {
+            putString("clientId", clientId)
+            putString("clientSecret", clientSecret)
+        }
     }
 }
